@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>선생님께 편지 보내기 ✉️</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #060918;
+      overflow-x: hidden;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 0.1; }
+      50% { opacity: 1; }
+    }
+    .star {
+      position: absolute;
+      background-color: white;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: blink infinite ease-in-out;
+    }
+    @keyframes pop {
+      0% { transform: scale(0); }
+      70% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .pop-animation {
+      display: inline-block;
+      animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* Alien & Shooting Star animations */
+    @keyframes flyUfo {
+      0% { left: -120px; transform: translateY(0px) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { left: calc(100vw + 120px); transform: translateY(30px) rotate(10deg); opacity: 0; }
+    }
+    .ufo-flying {
+      animation: flyUfo 15s linear forwards;
+    }
+
+    @keyframes dropStar {
+      0% { top: -60px; left: 85%; transform: rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100vh; left: 15%; transform: rotate(180deg); opacity: 0; }
+    }
+    .star-dropping {
+      animation: dropStar 11s linear forwards;
+    }
+  </style>
+</head>
+<body id="user-page" class="min-h-screen relative flex items-center justify-center p-4">
+  <!-- Back to Starry Board Navigation (Top Left Floating Widget) -->
+  <div class="fixed left-4 top-4 z-30">
+    <a href="index.html" class="bg-slate-950/80 backdrop-blur-md border border-white/10 hover:border-blue-500/40 px-4 py-2.5 rounded-full flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-900 transition-all shadow-2xl select-none">
+      <span>🏛️</span> 실시간 전광판 보기
+    </a>
+  </div>
+
+  <!-- Starry Background -->
+  <div id="star-container" class="absolute inset-0 z-0 overflow-hidden"></div>
+
+  <!-- Item Alerts / Toast Notifier -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-yellow-500/30 px-6 py-3 rounded-full text-sm font-semibold text-white shadow-2xl flex items-center gap-2 transform -translate-y-12 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-emoji">🌟</span> <span id="toast-msg">아이템을 획득했습니다!</span>
+  </div>
+
+  <!-- Random Mini-game Targets -->
+  <div id="game-layer" class="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+    <!-- Active Alien or Stars appear here -->
+  </div>
+
+  <!-- MAIN WRITING FORM CARD -->
+  <div id="form-card" class="relative z-10 w-full max-w-[420px] bg-[rgba(255,255,255,0.06)] backdrop-blur-[16px] border border-[rgba(255,255,255,0.12)] rounded-[24px] p-8 shadow-2xl text-white transition-all duration-300">
+    <div class="text-center mb-6">
+      <div id="badge-container" class="flex justify-center gap-2.5 mb-2">
+        <span class="text-xs bg-lime-600/30 text-lime-400 border border-lime-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+          👽 커스텀 티켓: <strong id="ticket-custom-count" class="font-bold">0</strong>
+        </span>
+        <span class="text-xs bg-yellow-600/30 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+          🌟 확성기 권한: <strong id="ticket-loud-count" class="font-bold">0</strong>
+        </span>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight flex items-center justify-center gap-1.5 ms-1">
+        <span id="title-emoji" class="transition-transform duration-300 hover:scale-110">✉️</span> 선생님께 편지 보내기
+      </h1>
+      <p class="text-xs text-slate-400 mt-1">
+        하늘에 날아다니는 <strong class="text-lime-400">외계인(👽)</strong>과 <strong class="text-yellow-400">별(🌟)</strong>을 클릭해 쿠폰을 획득하세요!
+      </p>
+    </div>
+
+    <!-- Letter Config Presets -->
+    <div id="presets-panel" class="mb-5 grid grid-cols-2 gap-2 text-xs">
+      <button type="button" id="tab-normal" class="py-2 rounded-xl text-center font-bold border border-blue-500 bg-blue-500/20 text-blue-200 transition">
+        기본 편지 (일반)
+      </button>
+      <button type="button" id="tab-custom" class="py-2 rounded-xl text-center font-semibold text-slate-400 border border-white/10 hover:border-slate-500 transition relative">
+        커스텀 (티켓 소요)
+        <span id="custom-alert-dot" class="absolute top-1.5 right-2 w-1.5 h-1.5 bg-lime-400 rounded-full animate-ping hidden"></span>
+      </button>
+    </div>
+
+    <form id="letter-form" onsubmit="return false;" class="space-y-4">
+      <!-- Name Input -->
+      <div>
+        <label for="student-name" class="block text-xs font-medium text-slate-300 mb-1">보내는 사람 (선택)</label>
+        <input 
+          type="text" 
+          id="student-name" 
+          maxlength="16"
+          placeholder="이름을 미입력하면 완전히 빈 칸으로 남습니다." 
+          class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400 transition placeholder:text-slate-500"
+        >
+      </div>
+
+      <!-- Letter Content -->
+      <div>
+        <label for="letter-message" class="block text-xs font-medium text-slate-300 mb-1">편지 내용 (필수)</label>
+        <textarea 
+          id="letter-message" 
+          required
+          placeholder="선생님께 감사함을 적어주세요...&#10;커스텀 모드에서는 글자 크기, 색깔, 편지지 색깔 조절이 가능합니다!" 
+          class="w-full min-h-[110px] bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400 transition placeholder:text-slate-500 resize-none font-medium"
+        ></textarea>
+      </div>
+
+      <!-- Standard Emoji Panel -->
+      <div id="standard-emoji-block" class="transition-all duration-300 duration-200">
+        <label class="block text-xs font-medium text-slate-300 mb-1.5">이모지 선택</label>
+        <div id="emoji-group" class="grid grid-cols-4 gap-1.5">
+          <button type="button" data-emoji="✏️" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition border-blue-500 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.3)]">✏️</button>
+          <button type="button" data-emoji="📚" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">📚</button>
+          <button type="button" data-emoji="🌟" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">🌟</button>
+          <button type="button" data-emoji="❤️" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">❤️</button>
+          <button type="button" data-emoji="😊" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">😊</button>
+          <button type="button" data-emoji="🎓" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">🎓</button>
+          <button type="button" data-emoji="🌈" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">🌈</button>
+          <button type="button" data-emoji="🙏" class="emoji-btn hover:bg-white/10 active:scale-95 border border-white/10 bg-white/5 py-2.5 rounded-xl text-xl flex items-center justify-center transition">🙏</button>
+        </div>
+      </div>
+
+      <!-- Custom Options Block (Only visible when Custom mode selected) -->
+      <div id="custom-options-block" class="hidden space-y-3 p-3.5 bg-lime-950/20 border border-lime-500/20 rounded-xl">
+        <h4 class="text-xs font-bold text-lime-400 flex items-center gap-1">✨ 커스텀 옵션 세팅</h4>
+
+        <!-- Direct Emoji Input -->
+        <div>
+          <label for="custom-emoji" class="block text-[11px] text-slate-300 mb-1">상징 이모지 직접 기입</label>
+          <input 
+            type="text" 
+            id="custom-emoji" 
+            maxlength="4"
+            placeholder="예: 🚀 / 👍" 
+            class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-lime-400 transition"
+          >
+        </div>
+
+        <!-- Custom Background selection -->
+        <div>
+          <label class="block text-[11px] text-slate-300 mb-1">편지지 배경색 그라데이션</label>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button type="button" data-bg="aurora" class="custom-bg-btn text-[10px] font-bold py-1.5 rounded bg-gradient-to-br from-emerald-950 to-teal-900 border-2 border-lime-400">오로라</button>
+            <button type="button" data-bg="cyber" class="custom-bg-btn text-[10px] py-1.5 rounded bg-gradient-to-br from-[#0c2e10] to-[#141b4e] border border-white/10">네온숲</button>
+            <button type="button" data-bg="mint" class="custom-bg-btn text-[10px] py-1.5 rounded bg-gradient-to-br from-[#0a2f1d] to-[#04081c] border border-white/10">민트밤</button>
+          </div>
+        </div>
+
+        <!-- Custom Text Configuration -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-slate-300 mb-1">글자 크기</label>
+            <select id="custom-font-size" class="w-full bg-slate-900/90 text-xs border border-white/25 rounded p-1.5 text-white">
+              <option value="small">작게</option>
+              <option value="normal" selected>보통</option>
+              <option value="large">크게</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-300 mb-1">글자 색깔</label>
+            <select id="custom-font-color" class="w-full bg-slate-900/90 text-xs border border-white/25 rounded p-1.5 text-white">
+              <option value="white" selected>흰색</option>
+              <option value="lime">밝은연두</option>
+              <option value="yellow">형광노랑</option>
+              <option value="pink">솜사탕핑크</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loudspeaker Selection Toggle -->
+      <div id="loudspeaker-option-block" class="p-3 bg-yellow-950/20 border border-yellow-500/20 rounded-xl flex items-center justify-between">
+        <div class="space-y-0.5">
+          <label class="block text-xs font-bold text-yellow-400">📢 확성기 편지로 올리기</label>
+          <p class="text-[10px] text-slate-400 leading-none">가장 먼저 노출되며 알림바에 장시간 고정!</p>
+        </div>
+        <input 
+          type="checkbox" 
+          id="use-loudspeaker" 
+          disabled
+          class="w-4 h-4 rounded text-yellow-600 focus:ring-yellow-500 border-white/20 bg-white/10"
+        >
+      </div>
+
+      <!-- Submit Button -->
+      <button 
+        type="submit" 
+        id="submit-btn" 
+        disabled
+        class="w-full bg-gradient-to-r from-[#3a5fd6] to-[#6a8ff5] hover:from-[#436bf0] hover:to-[#7ba0ff] disabled:opacity-50 disabled:pointer-events-none hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 py-3.5 rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+      >
+        <span>💌 선생님께 보내기</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- SUCCESS DIALOG SCREEN (Simplified) -->
+  <div id="success-card" class="hidden relative z-10 w-full max-w-[420px] bg-[rgba(255,255,255,0.06)] backdrop-blur-[16px] border border-[rgba(255,255,255,0.12)] rounded-[24px] p-8 shadow-2xl text-white text-center transition-all duration-300">
+    <div id="success-emoji-container" class="mb-4">
+      <span class="text-6xl inline-block">🌟</span>
+    </div>
+    <h2 class="text-2xl font-bold mb-3">편지가 전달됐어요!</h2>
+    <p class="text-slate-300 text-sm leading-relaxed mb-6">
+      정성스러운 마음을 실시간으로 배달했습니다.<br>
+      행복한 시간을 선물해 주셔서 대단히 감사합니다.
+    </p>
+
+    <div class="space-y-2">
+      <button 
+        id="btn-write-more"
+        class="w-full bg-gradient-to-r from-blue-600 to-[#5a7ff0] hover:from-blue-500 hover:to-[#6b8ff5] active:scale-98 transition py-3 rounded-xl text-xs font-bold shadow-lg"
+      >
+        다른 편지 더 쓰기 ✨
+      </button>
+      <a 
+        href="index.html"
+        class="w-full block text-center bg-white/10 hover:bg-white/20 active:scale-98 transition py-3 rounded-xl text-xs font-bold border border-white/20 text-slate-200"
+      >
+        🏛️ 실시간 전광판 가기
+      </a>
+    </div>
+  </div>
+
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // Firebase config initialized with user credentials
+    const firebaseConfig = {
+      apiKey: "AIzaSyBn4pfqx3UxSKaRfJhIa3BzpWH3HD6yt3I",
+      authDomain: "letter-d1664.firebaseapp.com",
+      databaseURL: "https://letter-d1664-default-rtdb.firebaseio.com",
+      projectId: "letter-d1664",
+      storageBucket: "letter-d1664.firebasestorage.app",
+      messagingSenderId: "802036079628",
+      appId: "1:802036079628:web:b697854cc10fe7c309e229",
+      measurementId: "G-76M1H5M9MF"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Dynamic Background Star Field (80 Stars)
+    const starContainer = document.getElementById('star-container');
+    const TOTAL_STARS = 80;
+    for (let i = 0; i < TOTAL_STARS; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      const size = Math.random() * 2 + 1;
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+      const delay = Math.random() * 3;
+      const duration = Math.random() * 3 + 1.5;
+
+      star.style.width = `${size}px`;
+      star.style.height = `${size}px`;
+      star.style.left = `${x}%`;
+      star.style.top = `${y}%`;
+      star.style.animationDelay = `${delay}s`;
+      star.style.animationDuration = `${duration}s`;
+
+      starContainer.appendChild(star);
+    }
+
+    // Dynamic Shooting star and Alien item generation
+    const gameLayer = document.getElementById('game-layer');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toast-msg');
+    const toastEmoji = document.getElementById('toast-emoji');
+
+    let ticketCustom = 0;
+    let ticketLoud = 0;
+
+    const elCustomCounter = document.getElementById('ticket-custom-count');
+    const elLoudCounter = document.getElementById('ticket-loud-count');
+
+    function updateTicketUis() {
+      elCustomCounter.textContent = ticketCustom;
+      elLoudCounter.textContent = ticketLoud;
+
+      // Handle Tab highlight state
+      const tabCustom = document.getElementById('tab-custom');
+      const dot = document.getElementById('custom-alert-dot');
+      if (ticketCustom > 0) {
+        tabCustom.classList.remove('text-slate-400');
+        tabCustom.classList.add('text-lime-300', 'border-lime-500/20');
+        dot.classList.remove('hidden');
+      } else {
+        tabCustom.classList.remove('text-lime-300', 'border-lime-500/20');
+        tabCustom.classList.add('text-slate-400');
+        dot.classList.add('hidden');
+      }
+
+      // Handle Loudspeaker Toggle state
+      const loudOption = document.getElementById('use-loudspeaker');
+      if (ticketLoud > 0) {
+        loudOption.removeAttribute('disabled');
+      } else {
+        loudOption.setAttribute('disabled', 'true');
+        loudOption.checked = false;
+      }
+    }
+
+    function showToast(message, emoji) {
+      toastMsg.textContent = message;
+      toastEmoji.textContent = emoji;
+      toast.classList.remove('opacity-0', '-translate-y-12', 'bounce');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-12');
+      }, 3000);
+    }
+
+    // Drop Shooting star function (🌟)
+    function spawnShootingStar() {
+      // Check if another exists
+      if (document.getElementById('live-shooting-star')) return;
+
+      const star = document.createElement('div');
+      star.id = 'live-shooting-star';
+      star.className = 'star-dropping absolute pointer-events-auto cursor-pointer z-40 select-none';
+      star.innerHTML = `
+        <div class="relative flex flex-col items-center select-none pointer-events-none active:scale-90 transition-transform p-3">
+          <span class="text-4xl filter drop-shadow-[0_0_15px_rgba(254,240,138,0.95)]">🌟</span>
+          <div class="absolute w-12 h-0.5 bg-gradient-to-r from-yellow-300 to-transparent -rotate-[30deg] -translate-y-4 -translate-x-4 opacity-80 blur-[0.5px]"></div>
+        </div>
+      `;
+      
+      const randomYFactor = Math.random() * 40;
+      star.style.top = `-${randomYFactor}px`;
+
+      star.addEventListener('click', () => {
+        ticketLoud++;
+        updateTicketUis();
+        showToast("행운의 별 포획! 확성기 1권 획득! 🌟", "🌟");
+        star.classList.add('scale-0', 'transition-all', 'duration-300');
+        setTimeout(() => star.remove(), 300);
+      });
+
+      gameLayer.appendChild(star);
+
+      // Self-cleanup after animation completes (11s)
+      setTimeout(() => {
+        if (star.parentNode) star.remove();
+      }, 11000);
+    }
+
+    // Spawn Flying UFO (👽)
+    function spawnUfoAlien() {
+      if (document.getElementById('live-ufo-alien')) return;
+
+      const ufo = document.createElement('div');
+      ufo.id = 'live-ufo-alien';
+      ufo.className = 'ufo-flying absolute pointer-events-auto cursor-pointer z-40 select-none';
+      ufo.style.top = `${Math.random() * 50 + 25}%`;
+      ufo.innerHTML = `
+        <div class="relative flex flex-col items-center group select-none pointer-events-none active:scale-95 transition-all p-3">
+          <!-- UFO Bubble Dome with glass shine and cute alien face inside -->
+          <div class="w-16 h-16 rounded-full border-2 border-lime-400 bg-slate-950/70 overflow-hidden flex items-center justify-center p-0.5 shadow-[0_0_20px_rgba(132,204,22,0.85)]">
+            <img src="src/assets/images/cute_alien_1781247207487.jpg" class="w-full h-full object-cover rounded-full" alt="Cute Alien" referrerPolicy="no-referrer">
+          </div>
+          <!-- Glowing saucer metallic ring base with indicators -->
+          <div class="w-24 h-4 bg-slate-800/95 border border-lime-400/80 rounded-full -mt-2 shadow-[0_6px_12px_rgba(0,0,0,0.6)] flex items-center justify-around px-2.5">
+            <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
+            <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
+            <span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+          </div>
+        </div>
+      `;
+
+      ufo.addEventListener('click', () => {
+        ticketCustom++;
+        updateTicketUis();
+        showToast("포획 성공! 커스텀 편지지 1회 권 획득! 👽", "👽");
+        ufo.classList.add('scale-0', 'transition-all', 'duration-300');
+        setTimeout(() => ufo.remove(), 300);
+      });
+
+      gameLayer.appendChild(ufo);
+
+      // Self-cleanup after animation completes (15s)
+      setTimeout(() => {
+        if (ufo.parentNode) ufo.remove();
+      }, 15000);
+    }
+
+    // Mini-game process managers
+    let gameIntervals = [];
+    let gameTimeouts = [];
+
+    function startMiniGame() {
+      stopMiniGame();
+      
+      const ufoInterval = setInterval(spawnUfoAlien, 15000); // comfortable spacing
+      const starInterval = setInterval(spawnShootingStar, 12000); 
+      
+      const ufoTimeout = setTimeout(spawnUfoAlien, 1200); 
+      const starTimeout = setTimeout(spawnShootingStar, 4000);
+      
+      gameIntervals.push(ufoInterval, starInterval);
+      gameTimeouts.push(ufoTimeout, starTimeout);
+    }
+
+    function stopMiniGame() {
+      gameIntervals.forEach(clearInterval);
+      gameTimeouts.forEach(clearTimeout);
+      gameIntervals = [];
+      gameTimeouts = [];
+      
+      // Clear visible game elements
+      gameLayer.innerHTML = '';
+    }
+
+
+    // PRESETS TAB MANAGERS
+    let activeMode = 'normal'; // 'normal' | 'custom'
+    const tabNormal = document.getElementById('tab-normal');
+    const tabCustom = document.getElementById('tab-custom');
+    const standardEmojiBlock = document.getElementById('standard-emoji-block');
+    const customOptionsBlock = document.getElementById('custom-options-block');
+    const titleEmoji = document.getElementById('title-emoji');
+
+    tabNormal.addEventListener('click', () => {
+      activeMode = 'normal';
+      tabNormal.className = "py-2 rounded-xl text-center font-bold border border-blue-500 bg-blue-500/20 text-blue-200 transition";
+      
+      // Reset Highlight other
+      const tc = ticketCustom > 0 ? "text-lime-300 border-lime-500/20" : "text-slate-400";
+      tabCustom.className = `py-2 rounded-xl text-center font-semibold border border-white/10 ${tc} transition relative`;
+
+      standardEmojiBlock.classList.remove('hidden');
+      customOptionsBlock.classList.add('hidden');
+      titleEmoji.textContent = '✉️';
+    });
+
+    tabCustom.addEventListener('click', () => {
+      if (ticketCustom <= 0) {
+        alert("👽 외계인 사냥을 통해 커스텀 편지지 쿠폰을 먼저 획득해 보세요!");
+        return;
+      }
+      activeMode = 'custom';
+      tabCustom.className = "py-2 rounded-xl text-center font-bold border border-lime-500 bg-lime-500/20 text-lime-200 transition";
+      tabNormal.className = "py-2 rounded-xl text-center font-semibold text-slate-400 border border-white/10 transition";
+
+      standardEmojiBlock.classList.add('hidden');
+      customOptionsBlock.classList.remove('hidden');
+      titleEmoji.textContent = '✨';
+    });
+
+    // Custom Background configuration Button Toggles
+    let selectedCustomBgStyle = 'aurora';
+    const customBgBtns = document.querySelectorAll('.custom-bg-btn');
+    customBgBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        customBgBtns.forEach(b => {
+          b.classList.remove('border-lime-400', 'border-2');
+          b.classList.add('border-white/10');
+        });
+        btn.classList.remove('border-white/10');
+        btn.classList.add('border-lime-400', 'border-2');
+        selectedCustomBgStyle = btn.getAttribute('data-bg');
+      });
+    });
+
+
+    // EMOJI GROUPING LOGIC (GENERAL MODE)
+    let selectedEmoji = '✏️';
+    const emojiButtons = document.querySelectorAll('.emoji-btn');
+    emojiButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        emojiButtons.forEach(b => {
+          b.classList.remove('border-blue-500', 'bg-blue-500/20', 'shadow-[0_0_12px_rgba(59,130,246,0.3)]');
+        });
+        btn.classList.add('border-blue-500', 'bg-blue-500/20', 'shadow-[0_0_12px_rgba(59,130,246,0.3)]');
+        selectedEmoji = btn.getAttribute('data-emoji');
+      });
+    });
+
+    // SUBMIT VALIDATOR CONTROLLER
+    const messageInput = document.getElementById('letter-message');
+    const submitBtn = document.getElementById('submit-btn');
+    messageInput.addEventListener('input', () => {
+      if (messageInput.value.trim().length > 0) {
+        submitBtn.removeAttribute('disabled');
+      } else {
+        submitBtn.setAttribute('disabled', 'true');
+      }
+    });
+
+    // SUBMIT FORM AND LOCAL TRACKING FOR THE "VIEW PREVIEW" VIEW
+    const letterForm = document.getElementById('letter-form');
+    const nameInput = document.getElementById('student-name');
+    const customEmojiInput = document.getElementById('custom-emoji');
+    const customFontSize = document.getElementById('custom-font-size');
+    const customFontColor = document.getElementById('custom-font-color');
+    const loudspeakerCheckbox = document.getElementById('use-loudspeaker');
+
+    const formCard = document.getElementById('form-card');
+    const successCard = document.getElementById('success-card');
+    const successEmojiContainer = document.getElementById('success-emoji-container');
+
+    // Local cached payload of successfully sent letter for client view
+    let sentLetterPayload = null;
+
+    letterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      // "이름을 입력하지 않았을 경우 '익명'이 아니라 그냥 비워진 칸" -> Empty string
+      const name = nameInput.value.trim();
+
+      // Setup payload options based on mode selected
+      let payload = {
+        name: name,
+        message: message,
+        visible: true,
+        timestamp: serverTimestamp()
+      };
+
+      const usingLoud = loudspeakerCheckbox.checked && ticketLoud > 0;
+      payload.isLoudspeaker = usingLoud;
+
+      if (activeMode === 'custom') {
+        const customEmojiVal = customEmojiInput.value.trim();
+        payload.isCustom = true;
+        payload.emoji = customEmojiVal || '👽';
+        payload.customBg = selectedCustomBgStyle;
+        payload.fontSize = customFontSize.value;
+        payload.textColor = customFontColor.value;
+      } else {
+        payload.isCustom = false;
+        payload.emoji = selectedEmoji;
+        payload.customBg = 'default';
+        payload.fontSize = 'normal';
+        payload.textColor = 'white';
+      }
+
+      // Pre-set submit status
+      submitBtn.setAttribute('disabled', 'true');
+      const textSpan = submitBtn.querySelector('span');
+      textSpan.textContent = "날아가는 중...";
+
+      try {
+        const lettersRef = ref(db, 'letters');
+        await push(lettersRef, payload);
+
+        // Deduct coupons successfully used
+        if (activeMode === 'custom') ticketCustom--;
+        if (usingLoud) ticketLoud--;
+        updateTicketUis();
+
+        // Save local copy to review right after
+        sentLetterPayload = { ...payload, timestamp: Date.now() };
+
+        // Hide main layout, slide in Success
+        formCard.classList.add('hidden');
+        successCard.classList.remove('hidden');
+
+        // Playful visual emoji popping
+        successEmojiContainer.innerHTML = `<span class="text-6xl inline-block pop-animation">${payload.emoji}</span>`;
+
+      } catch (err) {
+        console.error("전송 에러:", err);
+        alert("전송 실패했어요. 다시 시도해주세요.");
+        submitBtn.removeAttribute('disabled');
+        textSpan.textContent = "💌 선생님께 보내기";
+      }
+    });
+
+
+    // RESETTERS & NEXT OPTIONS
+    const btnWriteMore = document.getElementById('btn-write-more');
+
+    function resetFormState() {
+      letterForm.reset();
+      activeMode = 'normal';
+      tabNormal.click();
+      
+      // Restore emoji group highlighting
+      emojiButtons.forEach(b => b.classList.remove('border-blue-500', 'bg-blue-500/20', 'shadow-[0_0_12px_rgba(59,130,246,0.3)]'));
+      emojiButtons[0].classList.add('border-blue-500', 'bg-blue-500/20', 'shadow-[0_0_12px_rgba(59,130,246,0.3)]');
+      selectedEmoji = '✏️';
+
+      submitBtn.setAttribute('disabled', 'true');
+      const textSpan = submitBtn.querySelector('span');
+      textSpan.textContent = "💌 선생님께 보내기";
+
+      // Reset tickets
+      updateTicketUis();
+
+      successCard.classList.add('hidden');
+      formCard.classList.remove('hidden');
+    }
+
+    btnWriteMore.addEventListener('click', resetFormState);
+
+    // Run the mini-game (aliens and shooting stars catching) directly on loading
+    startMiniGame();
+  </script>
+</body>
+</html>

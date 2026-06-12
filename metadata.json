@@ -1,0 +1,6 @@
+{
+  "name": "선생님께 편지 보내기",
+  "description": "선생님께 이모지와 함께 정성스러운 편지를 보내고 실시간으로 모니터링 및 실시간 전광판으로 확인하는 웹 서비스입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

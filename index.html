@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>교실 전광판 🌟</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- QRCode CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #060918;
+      overflow: hidden;
+      height: 100vh;
+      color: #ffffff;
+    }
+    
+    /* Card entering animation */
+    @keyframes cardIn {
+      from {
+        transform: scale(0.8) translateY(16px);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+    .card-enter {
+      animation: cardIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* Card Floating animation */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(1deg); }
+    }
+    .card-float {
+      animation: float 3.8s ease-in-out infinite;
+    }
+
+    /* Side Panel Item Slide-in */
+    @keyframes fadeSlideIn {
+      from {
+        transform: translateY(8px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    .side-item {
+      animation: fadeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Custom scrollbar for interactive layouts */
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  </style>
+</head>
+<body class="relative w-full h-screen flex overflow-hidden select-none">
+  <!-- Dynamic Custom Backdrop Photo Layer (사진 뒤쪽에 원하는 사진 올리기) -->
+  <div id="board-custom-backdrop" class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700 opacity-0 pointer-events-none filter brightness-[0.4] saturate-[1.1]"></div>
+
+  <!-- Canvas Starry Field -->
+  <canvas id="starfield" class="absolute inset-0 w-full h-full z-1 block pointer-events-none opacity-85"></canvas>
+
+  <!-- Left Side Panel (width 200px) -->
+  <aside class="relative z-10 w-[200px] bg-slate-950/75 border-r border-white/10 flex flex-col h-full backdrop-blur-[6px]">
+    <div class="p-4 border-b border-white/5 flex items-center justify-between shadow-md">
+      <span class="font-bold text-xs tracking-wider text-blue-300 flex items-center gap-1.5 uppercase">
+        <span>💌</span> 오늘의 편지 우체통
+      </span>
+    </div>
+    <div id="side-list" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-2.5">
+      <!-- Items loaded dynamically -->
+    </div>
+    <!-- Direct navigation to Letter Writing screen -->
+    <div class="p-3 border-t border-white/5 bg-slate-950/45 shrink-0">
+      <a href="letter.html" class="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition duration-150 active:scale-95 shadow-lg shadow-indigo-500/10">
+        <span>✍️</span> 편지 직접 쓰기
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Board Area -->
+  <main id="main-board" class="relative flex-1 h-full overflow-hidden z-10">
+    <!-- Active Letters display floating here -->
+  </main>
+
+  <!-- SVGs & Flying Envelope (Fixed) -->
+  <div id="flying-envelope" class="fixed z-50 pointer-events-none transition-all duration-700 opacity-0" style="left: -120px; top: 35%;">
+    <!-- 80x60 Envelope SVG with Drop Shadow -->
+    <svg width="80" height="60" viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.4));">
+      <!-- Flapping Left Wing -->
+      <ellipse id="wl" cx="20" cy="31" rx="14" ry="7" fill="url(#wingGrad)" />
+      <!-- Flapping Right Wing -->
+      <ellipse id="wr" cx="60" cy="31" rx="14" ry="7" fill="url(#wingGrad)" />
+      <!-- Main Envelope Back -->
+      <rect x="23" y="18" width="34" height="24" rx="3" fill="#ffffff" />
+      <!-- Letter paper peek -->
+      <path d="M28 15h24v10H28z" fill="#f0fdf4" rx="1"/>
+      <line x1="31" y1="18" x2="49" y2="18" stroke="#cbd5e1" stroke-width="1.5"/>
+      <line x1="31" y1="21" x2="43" y2="21" stroke="#cbd5e1" stroke-width="1.5"/>
+      <!-- Envelope Fold Flap (Open) -->
+      <path d="M23 18 L40 31 L57 18" stroke="#cbd5e1" stroke-width="1" fill="#f8fafc" />
+      <!-- Envelope Bottom overlay -->
+      <polygon points="23,42 40,30 57,42" fill="#e2e8f0" opacity="0.95" />
+      <polygon points="23,18 23,42 40,30" fill="#cbd5e1" opacity="0.9" />
+      <polygon points="57,18 57,42 40,30" fill="#cbd5e1" opacity="0.9" stroke-linecap="round" />
+      <defs>
+        <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ff7ea5" />
+          <stop offset="100%" stop-color="#fd0054" />
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+
+  <!-- Multi-functional Utility QR Board (Top Right) -->
+  <div class="fixed right-4 top-4 z-20 flex flex-col gap-2.5">
+    <!-- QR Code card -->
+    <div class="bg-white p-3 rounded-2xl flex flex-col items-center shadow-2xl border border-white/20 select-none text-slate-800 transition hover:scale-105 duration-200">
+      <div id="qrcode" class="w-[110px] h-[110px] bg-slate-100 flex items-center justify-center p-0.5 rounded-lg"></div>
+      <span class="text-[10px] font-bold text-center mt-1.5 text-slate-600 tracking-tight flex items-center gap-1">
+        편지 작성하기 ✏️
+      </span>
+    </div>
+
+    <!-- Background Photo Customizer Widget (사진 뒤쪽에원하는 사진 올리는 기능 추가) -->
+    <div class="bg-slate-950/85 border border-white/10 p-2.5 rounded-2xl flex flex-col gap-1.5 shadow-2xl">
+      <span class="text-[9px] font-extrabold text-blue-300 text-center uppercase tracking-wide">🏞️ 전광판 배경 사진</span>
+      <label for="board-img-upload" class="cursor-pointer text-center text-[9px] bg-blue-600 hover:bg-blue-500 font-bold px-2 py-1.5 rounded-lg transition-all">
+        새 사진 올리기
+      </label>
+      <input type="file" id="board-img-upload" accept="image/*" class="hidden">
+      <button id="board-img-reset" class="text-white/60 hover:text-red-400 text-[8px] font-bold text-center py-0.5 hidden transition">
+        사진 초기화
+      </button>
+    </div>
+  </div>
+
+  <!-- Total Received Letter Count Badge (Fixed Bottom Right) -->
+  <div class="fixed right-4 bottom-5 z-20 bg-slate-900/90 backdrop-blur border border-white/10 px-4 py-2.5 rounded-full flex items-center gap-2 shadow-xl shrink-0">
+    <span class="text-xs text-slate-400 font-medium">받은 마음</span>
+    <span id="total-badge" class="bg-blue-600/95 text-white font-bold text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center">0</span>
+  </div>
+
+  <!-- Dynamic Notice Notification Bar (Fixed Bottom Centered) -->
+  <div id="notice-bar" class="fixed bottom-5 left-[220px] right-[110px] z-20 bg-gradient-to-r from-blue-950/95 to-slate-950/98 border border-blue-500/30 backdrop-blur px-6 py-3.5 rounded-2xl flex items-center gap-2.5 opacity-0 pointer-events-none transition-all duration-400 transform translate-y-2 shadow-2xl">
+    <span id="notice-icon" class="text-lg">💌</span>
+    <span id="notice-lead-text" class="text-xs font-bold text-blue-100">새 편지가 도착했어요!</span>
+    <span class="text-slate-500 text-xs">|</span>
+    <span id="notice-name" class="text-xs font-semibold text-yellow-300"></span>
+    <span id="notice-brief" class="text-xs text-slate-400 truncate flex-1 md:block hidden"></span>
+  </div>
+
+
+  <!-- MODAL FOR DETAILED CHAT VIEW & REACTIONS/COMMENTS FEEDBACK -->
+  <div id="detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm transition-all duration-300">
+    <div id="modal-card" class="relative w-full max-w-[460px] bg-slate-900/95 border border-white/15 rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-white scale-95 transition-transform duration-350">
+      
+      <!-- Close Button -->
+      <button id="modal-close-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg transition select-none">✕</button>
+
+      <!-- Badge area & Sender info -->
+      <div class="flex items-center gap-2.5 pb-2 border-b border-white/10">
+        <span id="modal-emoji" class="text-4xl">✏️</span>
+        <div>
+          <h3 id="modal-name" class="text-base font-bold text-white leading-tight"></h3>
+          <span id="modal-badge-custom" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full mt-1 inline-block">일반 편지</span>
+        </div>
+      </div>
+
+      <!-- Letter Content body -->
+      <div class="max-h-[160px] overflow-y-auto custom-scroll pr-1 font-medium leading-relaxed my-1">
+        <p id="modal-message" class="text-sm whitespace-pre-wrap break-words"></p>
+      </div>
+
+      <!-- Live Heart & Feedback Reactions (이모지 반응 시스템) -->
+      <div class="bg-white/5 border border-white/5 p-3 rounded-2xl flex flex-col gap-2">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">편지에 어울리는 마음을 눌러서 전해보세요!</span>
+        <div class="grid grid-cols-4 gap-2">
+          <button type="button" data-act="heart" class="btn-reaction bg-slate-950/40 hover:bg-red-500/10 border border-white/5 text-sm p-2 rounded-xl flex flex-col items-center gap-0.5 group active:scale-90 transition">
+            <span class="text-lg group-hover:scale-125 transition duration-150">❤️</span>
+            <span id="react-count-heart" class="text-[10px] font-bold text-slate-300">0</span>
+          </button>
+          <button type="button" data-act="thumbsUp" class="btn-reaction bg-slate-950/40 hover:bg-blue-500/10 border border-white/5 text-sm p-2 rounded-xl flex flex-col items-center gap-0.5 group active:scale-90 transition">
+            <span class="text-lg group-hover:scale-125 transition duration-150">👍</span>
+            <span id="react-count-thumbsUp" class="text-[10px] font-bold text-slate-300">0</span>
+          </button>
+          <button type="button" data-act="smile" class="btn-reaction bg-slate-950/40 hover:bg-yellow-500/10 border border-white/5 text-sm p-2 rounded-xl flex flex-col items-center gap-0.5 group active:scale-90 transition">
+            <span class="text-lg group-hover:scale-125 transition duration-150">😆</span>
+            <span id="react-count-smile" class="text-[10px] font-bold text-slate-300">0</span>
+          </button>
+          <button type="button" data-act="cry" class="btn-reaction bg-slate-950/40 hover:bg-emerald-500/10 border border-white/5 text-sm p-2 rounded-xl flex flex-col items-center gap-0.5 group active:scale-90 transition">
+            <span class="text-lg group-hover:scale-125 transition duration-150">🥺</span>
+            <span id="react-count-cry" class="text-[10px] font-bold text-slate-300">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Realtime Comments section (실시간 댓글 기능) -->
+      <div class="flex-1 flex flex-col gap-2 min-h-[160px] max-h-[220px]">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">댓글 목록 <strong id="modal-comments-count" class="text-blue-400">0</strong></span>
+        </div>
+        
+        <!-- comments container -->
+        <div id="modal-comments-area" class="flex-1 overflow-y-auto custom-scroll space-y-2 border border-white/5 bg-slate-950/40 p-2.5 rounded-xl">
+          <!-- Dynamically populated comments -->
+          <div class="text-center py-4 text-xs text-slate-500 font-medium">아직 등록된 댓글이 없습니다.</div>
+        </div>
+
+        <!-- Add comment entry -->
+        <form id="comment-add-form" onsubmit="return false;" class="flex gap-2">
+          <input 
+            type="text" 
+            id="comment-input" 
+            placeholder="선생님의 격려와 사랑을 적어보세요..." 
+            class="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 transition text-white"
+            maxlength="200"
+            required
+          >
+          <button 
+            type="submit" 
+            class="bg-blue-600 hover:bg-blue-500 font-bold text-xs px-4 py-2 rounded-xl transition active:scale-95"
+          >
+            남기기
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, query, orderByChild, onValue, update, push, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // Firebase config initialized with user credentials
+    const firebaseConfig = {
+      apiKey: "AIzaSyBn4pfqx3UxSKaRfJhIa3BzpWH3HD6yt3I",
+      authDomain: "letter-d1664.firebaseapp.com",
+      databaseURL: "https://letter-d1664-default-rtdb.firebaseio.com",
+      projectId: "letter-d1664",
+      storageBucket: "letter-d1664.firebasestorage.app",
+      messagingSenderId: "802036079628",
+      appId: "1:802036079628:web:b697854cc10fe7c309e229",
+      measurementId: "G-76M1H5M9MF"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // BACKGROUND PHOTO LOCAL MANAGEMENT (사진 뒤쪽 커스텀 사진 업로드)
+    const boardBackLayer = document.getElementById('board-custom-backdrop');
+    const imageUpload = document.getElementById('board-img-upload');
+    const imageResetBtn = document.getElementById('board-img-reset');
+
+    const savedBgp = localStorage.getItem('boardPostcardBgp');
+    if (savedBgp) {
+      boardBackLayer.style.backgroundImage = `url('${savedBgp}')`;
+      boardBackLayer.style.opacity = '0.35';
+      imageResetBtn.classList.remove('hidden');
+    }
+
+    imageUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const result = evt.target.result;
+        try {
+          localStorage.setItem('boardPostcardBgp', result);
+          boardBackLayer.style.backgroundImage = `url('${result}')`;
+          boardBackLayer.style.opacity = '0.35';
+          imageResetBtn.classList.remove('hidden');
+        } catch (err) {
+          console.warn("스토리지 크기 슬롯 초과 - 메모리 렌더로 대체합니다.");
+          boardBackLayer.style.backgroundImage = `url('${result}')`;
+          boardBackLayer.style.opacity = '0.35';
+          imageResetBtn.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    imageResetBtn.addEventListener('click', () => {
+      localStorage.removeItem('boardPostcardBgp');
+      boardBackLayer.style.backgroundImage = 'none';
+      boardBackLayer.style.opacity = '0';
+      imageResetBtn.classList.add('hidden');
+      imageUpload.value = '';
+    });
+
+
+    // STARRY BACKGROUND GENERATION (Canvas setup)
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+
+    let starsNormal = [];
+    let starsLarge = [];
+    const NORMAL_STARS_COUNT = 150;
+    const LARGE_STARS_COUNT = 12;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStars();
+    }
+
+    function initStars() {
+      starsNormal = [];
+      starsLarge = [];
+
+      for (let i = 0; i < NORMAL_STARS_COUNT; i++) {
+        starsNormal.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 1.6 + 0.3,
+          speed: Math.random() * 0.03 + 0.015,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      for (let i = 0; i < LARGE_STARS_COUNT; i++) {
+        starsLarge.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 2 + 1.8,
+          speed: Math.random() * 0.015 + 0.005,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function updateAndDrawStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let star of starsNormal) {
+        star.phase += star.speed;
+        const alpha = (Math.sin(star.phase) + 1.2) / 2.2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (let star of starsLarge) {
+        star.phase += star.speed;
+        const alpha = (Math.sin(star.phase) + 1.2) / 2.2;
+        
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.35})`;
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(star.x - 7, star.y);
+        ctx.lineTo(star.x + 7, star.y);
+        ctx.moveTo(star.x, star.y - 7);
+        ctx.lineTo(star.x, star.y + 7);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      requestAnimationFrame(updateAndDrawStars);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    updateAndDrawStars();
+
+
+    // QR CODE LOAD OUT
+    let qrUrl = window.location.href;
+    if (qrUrl.endsWith('index.html')) {
+      qrUrl = qrUrl.replace('index.html', 'letter.html');
+    } else if (qrUrl.endsWith('/')) {
+      qrUrl = qrUrl + 'letter.html';
+    } else {
+      const idx = qrUrl.lastIndexOf('/');
+      if (idx !== -1) {
+        qrUrl = qrUrl.substring(0, idx) + '/letter.html';
+      } else {
+        qrUrl = qrUrl + '/letter.html';
+      }
+    }
+
+    new QRCode(document.getElementById("qrcode"), {
+      text: qrUrl,
+      width: 110,
+      height: 110,
+      colorDark : "#060918",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.M
+    });
+
+
+    // CARD COLORS CYCLE DESIGN FOR STANDARD LETTERS
+    const CARD_STYLES = [
+      { bg: "rgba(30,50,120,0.7)", border: "rgba(150,180,255,0.3)" },
+      { bg: "rgba(50,20,100,0.7)", border: "rgba(200,150,255,0.3)" },
+      { bg: "rgba(10,40,90,0.7)", border: "rgba(100,180,255,0.3)" },
+      { bg: "rgba(60,20,80,0.7)", border: "rgba(220,160,255,0.3)" },
+      { bg: "rgba(20,50,80,0.7)", border: "rgba(120,200,255,0.3)" }
+    ];
+
+    // Notification banner controls
+    let noticeTimeout = null;
+
+    function showNotice(name, message, isLoud = false) {
+      if (noticeTimeout) clearTimeout(noticeTimeout);
+      const noticeBar = document.getElementById('notice-bar');
+      const noticeName = document.getElementById('notice-name');
+      const noticeBrief = document.getElementById('notice-brief');
+      const noticeIcon = document.getElementById('notice-icon');
+      const noticeLead = document.getElementById('notice-lead-text');
+
+      // "이름 미입력 시 익명이 아니라 그냥 비워진 칸"
+      noticeName.textContent = name ? `${name} 학생` : '';
+      noticeBrief.textContent = ` : "${message}"`;
+
+      if (isLoud) {
+        noticeIcon.textContent = '📢';
+        noticeLead.textContent = "행성 확성기 전파 도달!";
+        noticeBar.classList.remove('from-blue-900/90', 'to-indigo-950/90');
+        noticeBar.classList.add('from-yellow-600/95', 'to-slate-950/98', 'border-yellow-400');
+      } else {
+        noticeIcon.textContent = '💌';
+        noticeLead.textContent = "새 편지가 도착했어요!";
+        noticeBar.classList.remove('from-yellow-600/95', 'to-slate-950/98', 'border-yellow-400');
+        noticeBar.classList.add('from-blue-900/95', 'to-slate-950/98', 'border-blue-500/30');
+      }
+
+      noticeBar.classList.remove('opacity-0', 'translate-y-2', 'pointer-events-none');
+      noticeBar.classList.add('opacity-100', 'translate-y-0');
+
+      // Loudspeakers hold long duration notice (20s instead of 2.8s)
+      const duration = isLoud ? 20000 : 3500;
+      noticeTimeout = setTimeout(() => {
+        noticeBar.classList.remove('opacity-100', 'translate-y-0');
+        noticeBar.classList.add('opacity-0', 'translate-y-2', 'pointer-events-none');
+      }, duration);
+    }
+
+
+    // FLAPPING ENVELOPE FLY CONTROLLERS
+    function flyEnvelope(name, letterData) {
+      const env = document.getElementById('flying-envelope');
+      const wl = document.getElementById('wl');
+      const wr = document.getElementById('wr');
+      
+      env.style.left = '-120px';
+      env.style.opacity = '0';
+      env.style.transform = 'scale(0.8) rotate(0deg)';
+      env.style.transition = 'none';
+
+      let animationFrameId;
+      const startTime = performance.now();
+      
+      function flap(timestamp) {
+        const elapsed = timestamp - startTime;
+        const angle = Math.sin(elapsed * 0.035) * 24 + 16;
+        wl.setAttribute('transform', `rotate(${angle}, 20, 31)`);
+        wr.setAttribute('transform', `rotate(${-angle}, 60, 31)`);
+        animationFrameId = requestAnimationFrame(flap);
+      }
+      animationFrameId = requestAnimationFrame(flap);
+
+      setTimeout(() => {
+        env.style.transition = 'all 0.75s cubic-bezier(.22,.61,.36,1)';
+        env.style.left = '25%';
+        env.style.top = '30%';
+        env.style.opacity = '1';
+        env.style.transform = 'scale(1.1) rotate(5deg)';
+      }, 80);
+
+      setTimeout(() => {
+        env.style.transition = 'all 0.65s cubic-bezier(.22,.61,.36,1)';
+        env.style.left = '42%';
+        env.style.top = '35%';
+        env.style.transform = 'scale(1.0) rotate(-2deg)';
+      }, 800);
+
+      setTimeout(() => {
+        env.style.transition = 'all 0.5s ease-in';
+        env.style.left = '48%';
+        env.style.top = '38%';
+        env.style.opacity = '0';
+        env.style.transform = 'scale(0.85) rotate(-5deg)';
+      }, 1450);
+
+      setTimeout(() => {
+        cancelAnimationFrame(animationFrameId);
+        addLetterCard(letterData);
+        showNotice(name, letterData.message, letterData.isLoudspeaker);
+      }, 1950);
+    }
+
+
+    // ADD ACTIVE CARDS TO BOARD VIEWPORTS
+    const mainBoard = document.getElementById('main-board');
+    const sideList = document.getElementById('side-list');
+    const totalBadge = document.getElementById('total-badge');
+
+    let cardColorIndex = 0;
+
+    function addLetterCard(letter) {
+      const cardWidth = 180;
+      const cardHeight = 165;
+      const mainWidth = mainBoard.clientWidth || window.innerWidth - 200;
+      const mainHeight = mainBoard.clientHeight || window.innerHeight;
+
+      const randomX = Math.random() * (mainWidth - cardWidth - 80) + 40;
+      const randomY = Math.random() * (mainHeight - cardHeight - 110) + 50;
+
+      const card = document.createElement('div');
+      
+      // Setup dynamic classes & properties based on card parameters
+      let cardStyleClass = "";
+      let cardStyleAttrs = "";
+      let isLoud = letter.isLoudspeaker === true;
+      let isCustom = letter.isCustom === true;
+
+      // Layout sizing & text styling variables
+      let fontSizeClass = "text-xs";
+      if (letter.fontSize === 'small') fontSizeClass = "text-[10px]";
+      if (letter.fontSize === 'large') fontSizeClass = "text-sm font-semibold";
+
+      let fontColorStyle = "color: #ffffff";
+      if (letter.textColor === 'lime') fontColorStyle = "color: #a3e635";
+      if (letter.textColor === 'yellow') fontColorStyle = "color: #facc15";
+      if (letter.textColor === 'pink') fontColorStyle = "color: #f472b6";
+
+      if (isLoud) {
+        // 노란색 테마 강렬 강조!
+        cardStyleClass = "letter-card absolute w-[180px] p-4 rounded-[18px] backdrop-blur-md shadow-2xl flex flex-col justify-between border-2 border-yellow-500 bg-yellow-950/75 select-none hover:scale-105 active:scale-95 transition-all duration-300 pointer-events-auto cursor-pointer";
+        card.style.zIndex = "40"; // floating high
+      } else if (isCustom) {
+        // 커스텀 편지지: 초록색 기반 오로라/네온/민트
+        let bgStyle = "bg-[#0b1f13]/85 border-[#a3e635]/45";
+        if (letter.customBg === 'cyber') bgStyle = "bg-[#0a1622]/85 border-[#059669]/50";
+        if (letter.customBg === 'mint') bgStyle = "bg-[#021f14]/85 border-[#10b981]/50";
+
+        cardStyleClass = `letter-card absolute w-[180px] p-4 rounded-[18px] backdrop-blur-md shadow-2xl flex flex-col justify-between border ${bgStyle} select-none hover:scale-105 active:scale-95 transition-all duration-300 pointer-events-auto cursor-pointer`;
+        card.style.zIndex = "20";
+      } else {
+        // 일반 편지지: 5색 스타일 무작위 순환
+        const s = CARD_STYLES[cardColorIndex % 5];
+        cardColorIndex++;
+        cardStyleClass = "letter-card absolute w-[180px] p-4 rounded-[18px] backdrop-blur-[6px] shadow-2xl flex flex-col justify-between border select-none hover:scale-105 active:scale-95 transition-all duration-300 pointer-events-auto cursor-pointer";
+        card.style.backgroundColor = s.bg;
+        card.style.borderColor = s.border;
+        card.style.borderWidth = '1px';
+        card.style.zIndex = "10";
+      }
+
+      card.className = cardStyleClass;
+      card.style.left = `${randomX}px`;
+      card.style.top = `${randomY}px`;
+
+      const uniqueDelay = Math.random() * -3.5;
+      card.style.animation = `cardIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, float 3.8s ease-in-out infinite ${uniqueDelay}s`;
+
+      // Reaction counter sum
+      let totalReactionSum = 0;
+      if (letter.reactions) {
+        totalReactionSum = Object.values(letter.reactions).reduce((acc, curr) => acc + (parseInt(curr) || 0), 0);
+      }
+      
+      // Comments length sum
+      let commentLength = 0;
+      if (letter.comments) {
+        commentLength = Object.keys(letter.comments).length;
+      }
+
+      // "이름 미입력 시 익명이 아니라 그냥 비워진 칸"
+      const nameTagHtml = letter.name 
+        ? `<span class="text-[9px] font-bold tracking-tight text-white/90 bg-white/10 px-1.5 py-0.5 rounded">${letter.name}</span>`
+        : '';
+
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-lg">${letter.emoji || '✏️'}</span>
+            ${nameTagHtml}
+          </div>
+          <p style="${fontColorStyle}" class="${fontSizeClass} leading-relaxed break-words whitespace-pre-wrap line-clamp-4">${letter.message}</p>
+        </div>
+        <!-- Card feedback footprint tag badges -->
+        <div class="flex items-center justify-between text-[8px] font-bold text-white/50 pt-2 border-t border-white/5 mt-1.5 select-none">
+          <span class="flex items-center gap-0.5"><strong class="text-red-400">❤️</strong> ${totalReactionSum}</span>
+          <span class="flex items-center gap-0.5"><strong class="text-blue-400">💬</strong> ${commentLength}</span>
+        </div>
+      `;
+
+      // Limit to 15 cards
+      const activeCards = mainBoard.querySelectorAll('.letter-card');
+      if (activeCards.length >= 15) {
+        activeCards[0].remove();
+      }
+
+      // Click callback opens Feedback Detail dialog!
+      card.addEventListener('click', () => {
+        openDetailModal(letter);
+      });
+
+      mainBoard.appendChild(card);
+
+      // Auto self-cleanup after exactly 10s (10000ms) with gentle fade transition
+      setTimeout(() => {
+        card.style.opacity = '0';
+        setTimeout(() => {
+          card.remove();
+        }, 500);
+      }, 10000);
+    }
+
+    // UPDATE LATENT SIDEBAR PANEL items
+    function updateSidebar(letters) {
+      sideList.innerHTML = '';
+      const recent = [...letters].reverse().slice(0, 8);
+
+      recent.forEach((letter, idx) => {
+        const item = document.createElement('div');
+        item.className = "side-item bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col gap-1 hover:bg-white/10 transition cursor-pointer";
+        item.style.animationDelay = `${idx * 0.05}s`;
+
+        // "이름 미입력 시 익명이 아니라 그냥 비워진 칸"
+        const nameHeader = letter.name 
+          ? `<span class="text-xs font-bold text-slate-100 truncate">${letter.name}</span>`
+          : `<span class="text-[10px] text-slate-500 font-bold italic">이름 없음</span>`;
+
+        item.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm">${letter.emoji || '✏️'}</span>
+            ${nameHeader}
+          </div>
+          <p class="text-[9px] text-slate-400 font-medium leading-normal line-clamp-2 break-all mt-0.5">${letter.message}</p>
+        `;
+
+        item.addEventListener('click', () => {
+          openDetailModal(letter);
+        });
+
+        sideList.appendChild(item);
+      });
+    }
+
+
+    // MODAL DETAILED REACTIONS AND LIVE FEEDBACK POPULARITY ENGINE
+    const detailModal = document.getElementById('detail-modal');
+    const modalCard = document.getElementById('modal-card');
+    const modalEmoji = document.getElementById('modal-emoji');
+    const modalName = document.getElementById('modal-name');
+    const modalBadge = document.getElementById('modal-badge-custom');
+    const modalMessage = document.getElementById('modal-message');
+    const modalCommentsArea = document.getElementById('modal-comments-area');
+    const modalCommentsCount = document.getElementById('modal-comments-count');
+    const commentInput = document.getElementById('comment-input');
+    const commentAddForm = document.getElementById('comment-add-form');
+
+    let currentSelectedLetterKey = null;
+
+    function openDetailModal(letter) {
+      currentSelectedLetterKey = letter.key;
+
+      modalEmoji.textContent = letter.emoji;
+      
+      // "이름 미입력 시 익명이 아니라 그냥 비워진 칸"
+      modalName.textContent = letter.name ? `BY. ${letter.name}` : '(이름 미기입)';
+
+      modalMessage.textContent = letter.message;
+
+      // Styling details customization
+      if (letter.isLoudspeaker) {
+        modalBadge.textContent = "📢 확성기 편지";
+        modalBadge.className = "text-[9px] font-extrabold uppercase px-2 py-0.5 bg-yellow-500 text-slate-950 rounded-full";
+      } else if (letter.isCustom) {
+        modalBadge.textContent = "👽 커스텀 편지";
+        modalBadge.className = "text-[9px] font-extrabold uppercase px-2 py-0.5 bg-lime-500 text-slate-950 rounded-full";
+      } else {
+        modalBadge.textContent = "✉️ 일반 편지";
+        modalBadge.className = "text-[9px] font-extrabold uppercase px-2 py-0.5 bg-blue-600 text-white rounded-full";
+      }
+
+      // Sync active database reactions right away
+      syncReactionsDisplay(letter);
+      syncCommentsList(letter);
+
+      // Listen for Live Reaction Changes exclusively inside card scope
+      const targetLetterStatusRef = ref(db, `letters/${letter.key}`);
+      onValue(targetLetterStatusRef, (snap) => {
+        const val = snap.val();
+        if (val) {
+          syncReactionsDisplay(val);
+          syncCommentsList(val);
+        }
+      });
+
+      detailModal.classList.remove('hidden');
+      setTimeout(() => modalCard.style.transform = 'scale(1)', 50);
+    }
+
+    function syncReactionsDisplay(val) {
+      const reactionsObj = val.reactions || {};
+      document.getElementById('react-count-heart').textContent = reactionsObj.heart || 0;
+      document.getElementById('react-count-thumbsUp').textContent = reactionsObj.thumbsUp || 0;
+      document.getElementById('react-count-smile').textContent = reactionsObj.smile || 0;
+      document.getElementById('react-count-cry').textContent = reactionsObj.cry || 0;
+    }
+
+    function syncCommentsList(val) {
+      modalCommentsArea.innerHTML = '';
+      const commentsDict = val.comments || {};
+      const keys = Object.keys(commentsDict);
+      
+      modalCommentsCount.textContent = keys.length;
+
+      if (keys.length === 0) {
+        modalCommentsArea.innerHTML = '<div class="text-center py-4 text-xs text-slate-500 font-medium">따뜻하고 소중한 첫 댓글을 달아주세요! 💬</div>';
+        return;
+      }
+
+      // Sort by chronological order
+      const list = keys.map(k => ({ id: k, ...commentsDict[k] })).sort((a, b) => a.timestamp - b.timestamp);
+
+      list.forEach(c => {
+        const row = document.createElement('div');
+        row.className = "text-xs border-b border-white/5 pb-2 last:border-0 flex flex-col gap-0.5";
+        row.innerHTML = `
+          <p class="text-slate-100 font-normal leading-normal whitespace-pre-wrap break-all">${c.text}</p>
+          <span class="text-[8px] font-mono text-slate-500">방금 전</span>
+        `;
+        modalCommentsArea.appendChild(row);
+      });
+
+      // Auto Scroll to bottom
+      modalCommentsArea.scrollTop = modalCommentsArea.scrollHeight;
+    }
+
+    // Reaction triggering buttons list
+    const btnReactions = document.querySelectorAll('.btn-reaction');
+    btnReactions.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!currentSelectedLetterKey) return;
+        const actName = btn.getAttribute('data-act');
+        
+        const countRef = ref(db, `letters/${currentSelectedLetterKey}/reactions/${actName}`);
+        
+        try {
+          await runTransaction(countRef, (currentValue) => {
+            return (currentValue || 0) + 1;
+          });
+        } catch (err) {
+          console.error("공감도 반영 중 실패:", err);
+        }
+      });
+    });
+
+    // Add Comment submit logic
+    commentAddForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentSelectedLetterKey) return;
+
+      const txt = commentInput.value.trim();
+      if (!txt) return;
+
+      const commentsPoolRef = ref(db, `letters/${currentSelectedLetterKey}/comments`);
+      
+      try {
+        await push(commentsPoolRef, {
+          text: txt,
+          timestamp: Date.now()
+        });
+        commentInput.value = '';
+      } catch (err) {
+        console.error("댓글 업로드 랙킹 에러:", err);
+        alert("댓글을 올리지 못했습니다.");
+      }
+    });
+
+    // Close Detail Modal Dialog
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    function closeModal() {
+      modalCard.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        detailModal.classList.add('hidden');
+        currentSelectedLetterKey = null;
+      }, 150);
+    }
+    modalCloseBtn.addEventListener('click', closeModal);
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) closeModal();
+    });
+
+
+
+    // MAIN FIREBASE TRANSACTION AND LISTENER LOGIC
+    let prevKeys = new Set();
+    let initialLoaded = false;
+
+    const lettersRef = ref(db, 'letters');
+    const lettersQuery = query(lettersRef, orderByChild('timestamp'));
+
+    onValue(lettersQuery, (snapshot) => {
+      const data = snapshot.val();
+      const entries = [];
+
+      if (data) {
+        Object.keys(data).forEach(key => {
+          const item = data[key];
+          if (item.visible !== false) {
+            entries.push({ key, ...item });
+          }
+        });
+      }
+
+      if (!initialLoaded) {
+        totalBadge.textContent = entries.length;
+        updateSidebar(entries);
+
+        // Put down latest 3 general cards right off
+        const startCards = entries.slice(-3);
+        startCards.forEach(item => {
+          addLetterCard(item);
+        });
+
+        entries.forEach(item => prevKeys.add(item.key));
+        cardColorIndex = entries.length;
+        initialLoaded = true;
+      } else {
+        totalBadge.textContent = entries.length;
+        updateSidebar(entries);
+
+        // Spot fresh keys representing the new mail
+        entries.forEach(item => {
+          if (!prevKeys.has(item.key)) {
+            prevKeys.add(item.key);
+            // Trigger customized flapping fly visual envelope
+            flyEnvelope(item.name, item);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
